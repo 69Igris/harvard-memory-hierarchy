@@ -1,0 +1,5 @@
+program,instret,loads,stores,mem_fraction,harvard_cycles,vonneumann_cycles,harvard_cpi,vonneumann_cpi,speedup,parallel_cycles_harvard,stall_cycles_vn,model_match,self_check
+array_sum,176,32,3,0.1989,176,211,1.0,1.199,1.199,35,35,yes,PASS
+bubble_sort,633,132,65,0.3112,633,830,1.0,1.311,1.311,197,197,yes,PASS
+fibonacci,128,0,2,0.0156,128,130,1.0,1.016,1.016,2,2,yes,PASS
+vector_add,156,32,17,0.3141,156,205,1.0,1.314,1.314,49,49,yes,PASS
