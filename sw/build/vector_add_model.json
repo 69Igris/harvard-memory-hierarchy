@@ -1,0 +1,16 @@
+{
+  "instret": 156,
+  "loads": 32,
+  "stores": 17,
+  "branches": 16,
+  "taken": 15,
+  "jumps": 0,
+  "alu": 91,
+  "out": [],
+  "program": "vector_add",
+  "code_words": 21,
+  "data_words": 48,
+  "mem_fraction": 0.3141,
+  "pred_cycles_harvard": 156,
+  "pred_cycles_vonneumann": 205
+}

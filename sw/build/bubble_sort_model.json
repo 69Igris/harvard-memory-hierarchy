@@ -1,0 +1,16 @@
+{
+  "instret": 633,
+  "loads": 132,
+  "stores": 65,
+  "branches": 154,
+  "taken": 55,
+  "jumps": 66,
+  "alu": 216,
+  "out": [],
+  "program": "bubble_sort",
+  "code_words": 25,
+  "data_words": 12,
+  "mem_fraction": 0.3112,
+  "pred_cycles_harvard": 633,
+  "pred_cycles_vonneumann": 830
+}

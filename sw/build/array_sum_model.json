@@ -1,0 +1,18 @@
+{
+  "instret": 176,
+  "loads": 32,
+  "stores": 3,
+  "branches": 32,
+  "taken": 31,
+  "jumps": 0,
+  "alu": 109,
+  "out": [
+    528
+  ],
+  "program": "array_sum",
+  "code_words": 21,
+  "data_words": 33,
+  "mem_fraction": 0.1989,
+  "pred_cycles_harvard": 176,
+  "pred_cycles_vonneumann": 211
+}
