@@ -1,0 +1,18 @@
+# simulation outputs (regenerate with sim/run_all.sh)
+sim/out/
+*.vvp
+*.vcd
+
+# LaTeX build files
+report/*.aux
+report/*.log
+report/*.out
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/build.log
+
+__pycache__/
+
+# demo video lives on Google Drive (link in README)
+video/*.mp4
