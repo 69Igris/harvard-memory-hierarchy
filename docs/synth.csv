@@ -1,0 +1,6 @@
+design,LUT,FF,LUTRAM,BRAM,CARRY4,MUXF,logic_depth
+harvard,874,129,140,1,51,6,15
+vonneumann,1210,162,268,0,51,1,78
+split,1676,303,388,0,73,4,23
+unified,1770,315,387,0,67,35,60
+l1_cache_256B,175,98,12,0,7,0,7

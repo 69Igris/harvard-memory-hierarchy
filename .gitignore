@@ -16,3 +16,6 @@ __pycache__/
 
 # demo video lives on Google Drive (link in README)
 video/*.mp4
+
+# synthesis logs (regenerate with synth/run_synth.sh)
+synth/logs/
