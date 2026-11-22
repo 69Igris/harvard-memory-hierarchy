@@ -1,0 +1,16 @@
+{
+  "instret": 394,
+  "loads": 64,
+  "stores": 65,
+  "branches": 64,
+  "taken": 63,
+  "jumps": 0,
+  "alu": 201,
+  "out": [],
+  "program": "memcpy",
+  "code_words": 16,
+  "data_words": 128,
+  "mem_fraction": 0.3274,
+  "pred_cycles_harvard": 394,
+  "pred_cycles_vonneumann": 523
+}

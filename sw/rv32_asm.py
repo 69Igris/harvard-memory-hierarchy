@@ -206,7 +206,11 @@ def assemble(path):
 
 
 # ----------------------------------------------------------------- golden ISS
-def simulate(code, data, max_steps=200000):
+def simulate(code, data, max_steps=200000, trace=None):
+    """Run the program. If 'trace' is a list, every memory access is appended
+    to it in program order as (kind, byte_addr): 'I' fetch, 'R' load, 'W'
+    store (data-memory accesses only; I/O is uncached and not traced).
+    The trace drives the cache model in sw/cache_model.py."""
     imem = code + [0x13] * (IMEM_WORDS - len(code))
     dmem = data + [0] * (DMEM_WORDS - len(data))
     x = [0] * 32
@@ -224,6 +228,8 @@ def simulate(code, data, max_steps=200000):
 
     for _ in range(max_steps):
         ins = imem[(pc >> 2) % IMEM_WORDS]
+        if trace is not None:
+            trace.append(("I", pc))
         op = ins & 0x7F
         rd = (ins >> 7) & 31
         f3 = (ins >> 12) & 7
@@ -259,9 +265,13 @@ def simulate(code, data, max_steps=200000):
             st["loads"] += 1
             kind, i = daddr(a + immi)
             res = dmem[i] if kind == "d" else 0
+            if trace is not None and kind == "d":
+                trace.append(("R", u32(a + immi)))
         elif op == 0x23:
             st["stores"] += 1
             kind, i = daddr(a + imms)
+            if trace is not None and kind == "d":
+                trace.append(("W", u32(a + imms)))
             if kind == "d":
                 dmem[i] = b
             elif i == 0:

@@ -1,0 +1,16 @@
+{
+  "instret": 2596,
+  "loads": 128,
+  "stores": 17,
+  "branches": 492,
+  "taken": 219,
+  "jumps": 300,
+  "alu": 1659,
+  "out": [],
+  "program": "matmul",
+  "code_words": 53,
+  "data_words": 48,
+  "mem_fraction": 0.0559,
+  "pred_cycles_harvard": 2596,
+  "pred_cycles_vonneumann": 2741
+}
