@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory Hierarchy Presentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0f1e; --panel:#141b2e; --panel2:#1b2440; --line:#2a3454;
+  --ink:#eef1f8; --ink2:#b4bdd4; --muted:#7d88a6;
+  --s-split:#3987e5;   /* split L1  (ours)  */
+  --s-vn:#d95926;      /* VN flat           */
+  --s-sflat:#199e70;   /* split flat        */
+  --s-uni:#c98500;     /* unified L1        */
+  --good:#2fbf71; --bad:#e5484d; --warn:#e6a23c;
+  --accent:#7aa7ff;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
+#stage{position:fixed;inset:0}
+#deck{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center}
+.slide{position:absolute;inset:0;padding:56px 72px;opacity:0;pointer-events:none;
+  transform:translateX(60px) scale(.985);transition:opacity .6s ease,transform .7s cubic-bezier(.2,.8,.2,1);
+  background:radial-gradient(1200px 600px at 85% -10%,#18244a 0%,transparent 60%),radial-gradient(900px 500px at -10% 110%,#151d3a 0%,transparent 60%),var(--bg);
+  border-radius:4px;overflow:hidden}
+.slide.active{opacity:1;pointer-events:auto;transform:none}
+.slide.past{transform:translateX(-60px) scale(.985)}
+h1{font-size:58px;font-weight:800;letter-spacing:-1.5px;line-height:1.05}
+h2{font-size:40px;font-weight:800;letter-spacing:-.8px;margin-bottom:6px}
+.kicker{font:600 14px var(--mono);letter-spacing:2.5px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.sub{font-size:20px;color:var(--ink2);line-height:1.45}
+p,li{font-size:21px;line-height:1.5;color:var(--ink2)}
+b,strong{color:var(--ink)}
+code,.mono{font-family:var(--mono)}
+.row{display:flex;gap:28px}
+.col{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.pill{display:inline-block;padding:4px 12px;border-radius:99px;font:600 13px var(--mono);background:var(--panel2);border:1px solid var(--line);color:var(--ink2)}
+.big-num{font-size:64px;font-weight:800;letter-spacing:-2px}
+.muted{color:var(--muted)}
+.hl{color:var(--accent)}
+.foot{position:absolute;left:72px;right:72px;bottom:26px;display:flex;justify-content:space-between;font:500 13px var(--mono);color:var(--muted)}
+
+/* fragments */
+[data-f]{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
+[data-f].on{opacity:1;transform:none}
+[data-f].pop{transform:scale(.85)}
+[data-f].pop.on{transform:none}
+[data-f].left{transform:translateX(-30px)}
+[data-f].left.on{transform:none}
+[data-f].dim.on.dimmed{opacity:.35}
+
+/* entrance animation for things on slide activation */
+.slide.active .rise{animation:rise .8s cubic-bezier(.2,.8,.2,1) both}
+.slide.active .rise.d1{animation-delay:.12s}.slide.active .rise.d2{animation-delay:.24s}
+.slide.active .rise.d3{animation-delay:.36s}.slide.active .rise.d4{animation-delay:.48s}
+.slide.active .rise.d5{animation-delay:.6s}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+
+/* progress + counter */
+#bar{position:fixed;left:0;top:0;height:3px;background:linear-gradient(90deg,var(--s-split),#9db8ff);transition:width .5s ease;z-index:5}
+#count{position:fixed;right:16px;bottom:12px;font:500 12px var(--mono);color:var(--muted);z-index:5}
+#help{position:fixed;left:16px;bottom:12px;font:500 12px var(--mono);color:var(--muted);z-index:5;opacity:.7}
+#notes{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);width:min(900px,92vw);background:#0d1430ee;border:1px solid var(--line);
+  border-radius:12px;padding:14px 18px;font-size:16px;line-height:1.5;color:var(--ink2);display:none;z-index:6}
+#notes.show{display:block}
+#notes .t{font:600 12px var(--mono);color:var(--accent);letter-spacing:1.5px;margin-bottom:4px}
+.notes{display:none}
+
+/* ---------- title slide ---------- */
+#cells{position:absolute;right:-40px;top:40px;display:grid;grid-template-columns:repeat(12,34px);gap:8px;opacity:.55;transform:rotate(-8deg)}
+#cells span{width:34px;height:34px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);animation:blink 4s infinite}
+@keyframes blink{0%,100%{background:var(--panel2)}8%{background:var(--s-split)}20%{background:var(--panel2)}}
+#cells span.d{animation-name:blinkD}
+@keyframes blinkD{0%,100%{background:var(--panel2)}8%{background:var(--s-vn)}20%{background:var(--panel2)}}
+.team{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:34px}
+.team div{background:#141b2ecc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:15px;font-weight:600}
+.team div span{display:block;font:400 12px var(--mono);color:var(--muted);margin-top:2px}
+
+/* ---------- ticker ---------- */
+.ticker{overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:18px 0;margin:26px 0;position:relative}
+.ticker::before,.ticker::after{content:"";position:absolute;top:0;bottom:0;width:80px;z-index:2}
+.ticker::before{left:0;background:linear-gradient(90deg,var(--panel),transparent)}
+.ticker::after{right:0;background:linear-gradient(270deg,var(--panel),transparent)}
+.ticker .track{display:flex;gap:12px;width:max-content;animation:tick 22s linear infinite}
+@keyframes tick{to{transform:translateX(-50%)}}
+.ins{font:600 20px var(--mono);padding:10px 16px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.ins.m{border-color:var(--s-vn);color:#ffb08e;box-shadow:0 0 0 1px #d9592644,0 0 18px #d9592633}
+.ins small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+
+/* ---------- svg general ---------- */
+svg text{font-family:var(--sans);fill:var(--ink)}
+.box{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.boxh{fill:#17264a;stroke:var(--s-split);stroke-width:2}
+.boxo{fill:#2a1a14;stroke:var(--s-vn);stroke-width:2}
+.wire{stroke:#3a4670;stroke-width:6;fill:none;stroke-linecap:round}
+.lbl{font-size:15px;fill:var(--ink2)}
+.ttl{font-size:20px;font-weight:700}
+.stallTxt{font:800 22px var(--sans);fill:var(--bad);opacity:0}
+.slide.active .stallTxt{animation:stallBlink 3s infinite}
+@keyframes stallBlink{0%,55%{opacity:0}60%,90%{opacity:1}100%{opacity:0}}
+
+/* ---------- cycle strips ---------- */
+.strip{display:flex;gap:6px;margin:8px 0 4px}
+.cy{width:118px;height:62px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;font:600 15px var(--mono);border:1px solid var(--line);background:var(--panel);opacity:0;transform:translateY(10px) scale(.9)}
+.cy small{font:400 11px var(--mono);color:var(--muted)}
+.cy.f{border-color:var(--s-split);background:#13254a}
+.cy.d{border-color:var(--s-vn);background:#2c1810}
+.cy.fd{background:linear-gradient(135deg,#13254a 50%,#2c1810 50%);border-color:#6f86c9}
+.strip.go .cy{animation:cyIn .45s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes cyIn{to{opacity:1;transform:none}}
+.stripLbl{font:700 16px var(--sans);margin-top:16px;display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+/* ---------- bars ---------- */
+.hbar{display:grid;grid-template-columns:160px 1fr 80px;align-items:center;gap:14px;margin:9px 0}
+.hbar .n{font:500 16px var(--mono);color:var(--ink2);text-align:right}
+.hbar .t{height:26px;background:#ffffff08;border-radius:0 4px 4px 0;position:relative}
+.hbar .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:0 4px 4px 0;background:var(--s-split);transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+.hbar .v{font:700 17px var(--mono)}
+
+.vbars{display:flex;align-items:flex-end;gap:42px;height:310px;padding:0 20px;border-bottom:1px solid var(--line);position:relative}
+.vb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.vb .col{width:110px;flex:none;height:0;border-radius:4px 4px 0 0;transition:height 1.2s cubic-bezier(.2,.8,.2,1)}
+.vb .val{font:800 30px var(--sans);margin-bottom:8px}
+.vlabels{display:flex;gap:42px;padding:10px 20px 0}
+.vlabels div{flex:1;text-align:center;font-size:16px;color:var(--ink2);font-weight:600}
+.vlabels div small{display:block;color:var(--muted);font-weight:400;font-size:13px}
+
+/* ---------- cache demo ---------- */
+.cache-demo{display:grid;grid-template-columns:300px 1fr 230px;gap:26px;margin-top:20px}
+.req{font:700 30px var(--mono);text-align:center;padding:14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.split{display:flex;margin-top:12px;font:600 14px var(--mono);border-radius:8px;overflow:hidden}
+.split div{flex:1;padding:8px 4px;text-align:center}
+.split .tg{background:#2a2350}.split .ix{background:#153a35}.split .of{background:#2c2a14}
+.status{margin-top:16px;text-align:center;font:800 30px var(--sans);height:44px;transition:color .2s}
+.status.hit{color:var(--good)}.status.miss{color:var(--bad)}
+.ctable{width:100%;border-collapse:separate;border-spacing:0 8px}
+.ctable td{font:600 15px var(--mono);padding:10px 8px;background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center;transition:background .3s,box-shadow .3s}
+.ctable td:first-child{border-left:1px solid var(--line);border-radius:8px 0 0 8px;color:var(--muted)}
+.ctable td:last-child{border-right:1px solid var(--line);border-radius:0 8px 8px 0}
+.ctable tr.sel td{background:#1b2a50;box-shadow:inset 0 0 0 0 transparent}
+.ctable tr.sel.hit td{background:#123a29}
+.ctable tr.sel.miss td{background:#3d1719}
+.ctable td.w.flash{animation:flash .5s}
+@keyframes flash{from{background:#3987e5;color:#fff}}
+.ctable th{font:600 12px var(--mono);color:var(--muted);text-align:center;letter-spacing:1px}
+.mem{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;height:100%;position:relative}
+.mem .slow{font:600 13px var(--mono);color:var(--warn)}
+.stat{display:flex;justify-content:space-between;margin-top:10px;font:600 17px var(--mono)}
+
+/* ---------- timeline ---------- */
+.tl{display:grid;grid-template-columns:130px repeat(14,1fr);gap:4px;margin-top:22px;position:relative}
+.tl .h{font:600 12px var(--mono);color:var(--muted);text-align:center;padding-bottom:4px}
+.tl .r{font:700 15px var(--sans);display:flex;align-items:center;color:var(--ink2)}
+.tl .c{height:58px;border-radius:7px;font:600 12px var(--mono);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;background:#ffffff05;border:1px solid #ffffff08;opacity:0;transform:scale(.8)}
+.tl.go .c{animation:cyIn .35s ease forwards}
+.c.stall{background:#3d1719;border-color:#e5484d55;color:#ff9c9f}
+.c.run{background:#123a29;border-color:#2fbf7155;color:#8ee6b3}
+.c.req{background:#1b2a50;border-color:#3987e5;color:#a9c8ff}
+.c.wait{background:#2a2614;border-color:#c9850055;color:#ebc46a}
+.c.beat{background:#13254a;border-color:#3987e5;color:#cfe0ff}
+.c.wb{background:#2c1810;border-color:#d95926aa;color:#ffb08e}
+.c.e{background:transparent;border-color:transparent}
+#cursor{position:absolute;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 12px #fff;opacity:0;border-radius:2px}
+.tl.go #cursor{animation:sweep 5.6s linear forwards}
+
+/* ---------- conflict demo ---------- */
+.slot{width:260px;height:84px;border-radius:12px;border:2px solid var(--line);position:relative;background:var(--panel);overflow:hidden}
+.slot span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 22px var(--mono)}
+.slot .a{color:#a9c8ff}.slot .b{color:#ffcf7a}
+.slide.active .slot.fight .a{animation:swapA 2s infinite}
+.slide.active .slot.fight .b{animation:swapB 2s infinite}
+.slide.active .slot.fight{animation:shake 2s infinite}
+@keyframes swapA{0%,45%{opacity:1}50%,95%{opacity:0}100%{opacity:1}}
+@keyframes swapB{0%,45%{opacity:0}50%,95%{opacity:1}100%{opacity:0}}
+@keyframes shake{0%,44%,56%,94%{transform:none;border-color:var(--line)}47%,97%{transform:translateX(-5px);border-color:var(--bad)}50%,100%{transform:translateX(5px);border-color:var(--bad)}}
+.evict{font:800 16px var(--mono);color:var(--bad);opacity:0}
+.slide.active .evict{animation:ev 1s infinite}
+@keyframes ev{0%,40%{opacity:0}50%,80%{opacity:1}100%{opacity:0}}
+
+/* ---------- checks ---------- */
+.check{display:flex;gap:18px;align-items:flex-start;margin:16px 0}
+.tick{width:44px;height:44px;flex:none}
+.tick circle{fill:none;stroke:var(--good);stroke-width:3;stroke-dasharray:130;stroke-dashoffset:130}
+.tick path{fill:none;stroke:var(--good);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40}
+.on .tick circle{transition:stroke-dashoffset .7s ease;stroke-dashoffset:0}
+.on .tick path{transition:stroke-dashoffset .4s .55s ease;stroke-dashoffset:0}
+
+table.syn{border-collapse:collapse;width:100%;margin-top:14px}
+table.syn th,table.syn td{padding:11px 14px;text-align:right;font:500 17px var(--mono);border-bottom:1px solid var(--line)}
+table.syn th{color:var(--muted);font-size:13px;letter-spacing:1px}
+table.syn td:first-child,table.syn th:first-child{text-align:left;font-family:var(--sans);font-weight:600}
+
+/* chart svg */
+.axis{stroke:var(--line);stroke-width:1}
+.grid{stroke:#ffffff0c;stroke-width:1}
+.tickl{font:500 13px var(--mono);fill:var(--muted)}
+.series{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.endl{font:700 15px var(--sans)}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="stage"><div id="deck">
+
+<!-- 1 TITLE -->
+<section class="slide" id="s-title">
+  <div id="cells"></div>
+  <div style="position:relative;z-index:2;margin-top:60px;max-width:820px">
+    <div class="kicker rise">Modern Computer Architecture · Project 9 · Phase II</div>
+    <h1 class="rise d1">Instruction &amp; Data<br>Memory Hierarchy</h1>
+    <p class="sub rise d2" style="margin-top:18px;max-width:700px">Harvard, Modified-Harvard and shared-memory organisations, built in Verilog and measured cycle by cycle.</p>
+    <div class="team rise d3">
+      <div>Aaryan Yadav<span>core · integration</span></div>
+      <div>Shashwat Sinha<span>software · models</span></div>
+      <div>Shivam Mishra<span>data side · L1 cache</span></div>
+      <div>Himank Kaushik<span>memory · arbiter</span></div>
+      <div>Satyam Kumar<span>verification · report</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>B.Tech CSE (AI) · Rishihood University</span><span>→ / space to advance</span></div>
+  <div class="notes">Introduce the team and the one-line goal: compare a Harvard memory organisation (separate instruction and data memories) with a shared one, then extend it to a realistic cache hierarchy.</div>
+</section>
+
+<!-- 2 PROBLEM -->
+<section class="slide">
+  <div class="kicker rise">The problem</div>
+  <h2 class="rise d1">A CPU needs memory <span class="hl">twice</span> per instruction</h2>
+  <p class="rise d2">Every instruction must be <b>fetched</b>. Loads and stores must also <b>read or write data</b>.</p>
+  <div class="ticker rise d3"><div class="track" id="ticker"></div></div>
+  <div class="row">
+    <div class="card col" data-f="1"><div class="pill" style="color:#a9c8ff;border-color:var(--s-split)">FETCH</div><p style="margin-top:10px">Happens <b>every cycle</b>: read the next instruction at address PC.</p></div>
+    <div class="card col" data-f="2"><div class="pill" style="color:#ffb08e;border-color:var(--s-vn)">DATA</div><p style="margin-top:10px">Only <b>lw / sw</b>, about <b>20–47 %</b> of instructions in our programs.</p></div>
+    <div class="card col" data-f="3"><div class="pill">QUESTION</div><p style="margin-top:10px">Can both use <b>the same memory</b> in the same cycle? That choice is the whole project.</p></div>
+  </div>
+  <div class="notes">The scrolling stream is a real instruction mix. The orange ones (lw, sw) need a second memory access in the same cycle as the fetch.</div>
+</section>
+
+<!-- 3 ONE ROAD VS TWO -->
+<section class="slide">
+  <div class="kicker rise">Two organisations</div>
+  <h2 class="rise d1">One road, or two roads?</h2>
+  <div class="row" style="margin-top:22px">
+    <div class="col rise d2">
+      <svg viewBox="0 0 540 380" width="540" height="380">
+        <text x="0" y="24" class="ttl" style="fill:#ffb08e">Von Neumann: one shared memory</text>
+        <rect x="20" y="130" width="130" height="120" rx="14" class="box"/><text x="85" y="198" text-anchor="middle" class="ttl">CPU</text>
+        <rect x="380" y="110" width="140" height="160" rx="14" class="boxo"/><text x="450" y="185" text-anchor="middle" class="ttl">Memory</text><text x="450" y="210" text-anchor="middle" class="lbl">code + data</text>
+        <path id="vnbus" d="M150 190 H380" class="wire"/>
+        <text x="265" y="170" text-anchor="middle" class="lbl">1 port</text>
+        <circle r="11" fill="var(--s-split)"><animateMotion dur="3s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.45;1" calcMode="linear"><mpath href="#vnbus"/></animateMotion></circle>
+        <circle r="11" fill="var(--s-vn)" opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.5;.52;.98;1" dur="3s" repeatCount="indefinite"/><animateMotion dur="3s" repeatCount="indefinite" keyPoints="0;0;1" keyTimes="0;.52;1" calcMode="linear"><mpath href="#vnbus"/></animateMotion></circle>
+        <text x="265" y="245" text-anchor="middle" class="stallTxt">STALL: data waits its turn</text>
+        <text x="20" y="320" class="lbl"><tspan fill="#a9c8ff">●</tspan> fetch   <tspan fill="#ffb08e">●</tspan> load/store: one after the other</text>
+        <text x="20" y="350" class="lbl">lw / sw costs <tspan fill="#fff" font-weight="700">2 cycles</tspan></text>
+      </svg>
+    </div>
+    <div class="col rise d3">
+      <svg viewBox="0 0 540 380" width="540" height="380">
+        <text x="0" y="24" class="ttl" style="fill:#a9c8ff">Harvard: separate memories</text>
+        <rect x="20" y="130" width="130" height="120" rx="14" class="box"/><text x="85" y="198" text-anchor="middle" class="ttl">CPU</text>
+        <rect x="380" y="60" width="140" height="110" rx="14" class="boxh"/><text x="450" y="110" text-anchor="middle" class="ttl">I-Mem</text><text x="450" y="135" text-anchor="middle" class="lbl">code</text>
+        <rect x="380" y="210" width="140" height="110" rx="14" class="boxo"/><text x="450" y="260" text-anchor="middle" class="ttl">D-Mem</text><text x="450" y="285" text-anchor="middle" class="lbl">data</text>
+        <path id="hbi" d="M150 165 C260 165 270 115 380 115" class="wire"/>
+        <path id="hbd" d="M150 215 C260 215 270 265 380 265" class="wire"/>
+        <circle r="11" fill="var(--s-split)"><animateMotion dur="1.5s" repeatCount="indefinite"><mpath href="#hbi"/></animateMotion></circle>
+        <circle r="11" fill="var(--s-vn)"><animateMotion dur="1.5s" repeatCount="indefinite"><mpath href="#hbd"/></animateMotion></circle>
+        <text x="20" y="350" class="lbl">fetch + data <tspan fill="#fff" font-weight="700">in the same cycle</tspan>: every instruction is 1 cycle</text>
+      </svg>
+    </div>
+  </div>
+  <div class="notes">Left: one port, so the fetch and the data access take turns and a load/store stalls the CPU one cycle. Right: two ports, both happen at once.</div>
+</section>
+
+<!-- 4 COUNTING CYCLES -->
+<section class="slide" id="s-cycles">
+  <div class="kicker rise">Counting cycles</div>
+  <h2 class="rise d1">Same 5 instructions, different cost</h2>
+  <p class="rise d2">Program: <code>addi · lw · add · sw · addi</code></p>
+  <div class="stripLbl" style="color:#ffb08e"><span class="dot" style="background:var(--s-vn)"></span>Von Neumann: 7 cycles</div>
+  <div class="strip" id="stripVN">
+    <div class="cy f">addi<small>fetch</small></div><div class="cy f">lw<small>fetch</small></div><div class="cy d">lw<small>data</small></div><div class="cy f">add<small>fetch</small></div><div class="cy f">sw<small>fetch</small></div><div class="cy d">sw<small>data</small></div><div class="cy f">addi<small>fetch</small></div>
+  </div>
+  <div class="stripLbl" style="color:#a9c8ff"><span class="dot" style="background:var(--s-split)"></span>Harvard: 5 cycles</div>
+  <div class="strip" id="stripH">
+    <div class="cy f">addi<small>fetch</small></div><div class="cy fd">lw<small>fetch+data</small></div><div class="cy f">add<small>fetch</small></div><div class="cy fd">sw<small>fetch+data</small></div><div class="cy f">addi<small>fetch</small></div>
+  </div>
+  <div class="card" data-f="2" style="margin-top:26px;display:flex;align-items:center;gap:30px">
+    <div class="big-num mono" style="font-size:40px">CPI<sub style="font-size:18px">VN</sub> = 1 + f<sub style="font-size:18px">mem</sub></div>
+    <p>f<sub>mem</sub> = fraction of instructions that are loads or stores. Harvard CPI is always <b>1.00</b>.</p>
+  </div>
+  <div class="notes">Press once to play the cycle strips, again for the formula. Each lw/sw adds exactly one extra cycle on the shared memory.</div>
+</section>
+
+<!-- 5 PHASE I DESIGN -->
+<section class="slide">
+  <div class="kicker rise">Phase I · what we built</div>
+  <h2 class="rise d1">One core, two memory systems</h2>
+  <p class="rise d2">The <b>same</b> single-cycle RV32I core is used unchanged in both designs, so the memory is the only difference.</p>
+  <svg viewBox="0 0 1140 430" width="1140" height="430" style="margin-top:10px">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5a6895"/></marker></defs>
+    <g data-f="1">
+      <rect x="20" y="40" width="520" height="370" rx="16" fill="none" stroke="#3987e566" stroke-dasharray="6 6"/><text x="40" y="70" class="ttl" style="fill:#a9c8ff">harvard_top.v</text>
+      <rect x="40" y="110" width="110" height="60" rx="10" class="box"/><text x="95" y="146" text-anchor="middle">pc.v</text>
+      <rect x="40" y="220" width="110" height="80" rx="10" class="boxh"/><text x="95" y="256" text-anchor="middle">imem.v</text><text x="95" y="278" text-anchor="middle" class="lbl">code</text>
+      <rect x="200" y="110" width="150" height="190" rx="10" class="box"/><text x="275" y="150" text-anchor="middle" class="ttl">cpu_core</text>
+      <text x="275" y="180" text-anchor="middle" class="lbl">control_unit</text><text x="275" y="204" text-anchor="middle" class="lbl">regfile · alu</text><text x="275" y="228" text-anchor="middle" class="lbl">imm_gen</text>
+      <rect x="390" y="110" width="130" height="60" rx="10" class="box"/><text x="455" y="137" text-anchor="middle" font-size="15">addr_decoder</text><text x="455" y="157" text-anchor="middle" class="lbl" font-size="13">+ rw_control</text>
+      <rect x="390" y="210" width="130" height="70" rx="10" class="boxo"/><text x="455" y="250" text-anchor="middle">dmem.v</text>
+      <rect x="390" y="310" width="130" height="50" rx="10" class="box"/><text x="455" y="341" text-anchor="middle">io_regs</text>
+      <path d="M95 170V220" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M150 260H200" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M350 140H390" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M455 170V210" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M520 140C540 140 540 335 520 335" stroke="#5a6895" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+    </g>
+    <g data-f="2">
+      <rect x="600" y="40" width="520" height="370" rx="16" fill="none" stroke="#d9592666" stroke-dasharray="6 6"/><text x="620" y="70" class="ttl" style="fill:#ffb08e">vonneumann_top.v</text>
+      <rect x="630" y="110" width="150" height="190" rx="10" class="box"/><text x="705" y="200" text-anchor="middle" class="ttl">cpu_core</text><text x="705" y="226" text-anchor="middle" class="lbl">(same core)</text>
+      <rect x="830" y="150" width="120" height="110" rx="10" class="box"/><text x="890" y="200" text-anchor="middle">arbiter</text><text x="890" y="222" text-anchor="middle" class="lbl">FETCH/DATA</text>
+      <rect x="990" y="120" width="110" height="170" rx="10" class="boxo"/><text x="1045" y="196" text-anchor="middle">unified</text><text x="1045" y="218" text-anchor="middle">_mem</text>
+      <path d="M780 175H830" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M780 235H830" stroke="#5a6895" stroke-width="2" marker-end="url(#ar)"/>
+      <path d="M950 205H990" stroke="#5a6895" stroke-width="3" marker-end="url(#ar)"/>
+      <text x="970" y="320" text-anchor="middle" class="lbl">one port → core stalls on lw/sw</text>
+      <rect x="630" y="340" width="150" height="44" rx="10" class="box"/><text x="705" y="368" text-anchor="middle" class="lbl">perf_counters</text>
+    </g>
+  </svg>
+  <div class="notes">Left: Harvard. The core fetches from imem and reads data through the address decoder at the same time. Right: Von Neumann. The arbiter puts fetch and data in turn on one memory port.</div>
+</section>
+
+<!-- 6 PHASE I RESULTS -->
+<section class="slide" id="s-p1">
+  <div class="kicker rise">Phase I · results</div>
+  <h2 class="rise d1">Harvard speed-up = 1 + f<sub style="font-size:22px">mem</sub>, exactly</h2>
+  <p class="rise d2">Harvard speed-up over Von Neumann, 7 programs. The more loads and stores, the bigger the win.</p>
+  <div id="p1bars" style="margin-top:20px"></div>
+  <p class="rise d4" style="margin-top:14px;font-size:17px">Harvard CPI = <b>1.00</b> for every program. The hardware stall counter equals the number of loads + stores, every time.</p>
+  <div class="notes">These bars start at 1.0 (no speed-up). unrolled_sum has the most data accesses (47 %) so gains the most. fibonacci barely touches memory.</div>
+</section>
+
+<!-- 7 SLOW MEMORY -->
+<section class="slide">
+  <div class="kicker rise">Phase II · the real world</div>
+  <h2 class="rise d1">But real memory is <span style="color:var(--warn)">slow</span></h2>
+  <p class="rise d2">The brief's optional part: one <b>shared lower-level memory</b> that holds code and data and takes <b>LAT</b> cycles to answer.</p>
+  <div class="row" style="margin-top:30px;align-items:center">
+    <div class="col rise d3" style="text-align:center">
+      <svg viewBox="0 0 420 220" width="420" height="220">
+        <rect x="10" y="60" width="120" height="100" rx="14" class="box"/><text x="70" y="117" text-anchor="middle" class="ttl">CPU</text>
+        <rect x="290" y="50" width="120" height="120" rx="14" class="boxo"/><text x="350" y="105" text-anchor="middle" class="ttl">Main</text><text x="350" y="128" text-anchor="middle" class="ttl">memory</text>
+        <path id="slowp" d="M130 110H290" class="wire"/>
+        <circle r="10" fill="var(--s-split)"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;1;1;0;0" keyTimes="0;.12;.82;.94;1" calcMode="linear"><mpath href="#slowp"/></animateMotion></circle>
+        <g id="clockTicks"></g>
+        <text x="210" y="200" text-anchor="middle" class="lbl">CPU ticks <tspan fill="#ebc46a" font-weight="700">8 times</tspan> while it waits</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card" data-f="1"><p>At LAT = 8 with no cache, CPI jumps from 1 to about <b>12</b>.</p></div>
+      <div class="card" data-f="2" style="margin-top:14px"><p>Splitting the ports without caches: <b>12.28 → 12.01</b>. Only about <b>2 %</b> better, because both roads still end at the same slow memory.</p></div>
+      <div class="card" data-f="3" style="margin-top:14px;border-color:var(--s-split)"><p><b>Key insight:</b> two roads only help if each road has something <b>private and fast</b> on it. That is a cache.</p></div>
+    </div>
+  </div>
+  <div class="notes">This is why Phase II exists. Without caches, the Harvard advantage almost disappears once memory is slow and shared.</div>
+</section>
+
+<!-- 8 CACHE DEMO -->
+<section class="slide" id="s-cache">
+  <div class="kicker rise">The fix · L1 cache</div>
+  <h2 class="rise d1">A small, fast memory that remembers recent lines</h2>
+  <div class="cache-demo rise d2">
+    <div>
+      <div class="muted mono" style="font-size:13px;margin-bottom:6px">CORE ASKS FOR</div>
+      <div class="req" id="cReq">0x1000</div>
+      <div class="split"><div class="tg" id="cTag">tag</div><div class="ix" id="cIdx">index</div><div class="of" id="cOff">offset</div></div>
+      <div class="status" id="cStat">&nbsp;</div>
+      <p style="font-size:15px;margin-top:6px" id="cWhy">&nbsp;</p>
+    </div>
+    <div>
+      <table class="ctable" id="cTable">
+        <tr><th>SET</th><th>V</th><th>TAG</th><th>word 0</th><th>word 1</th><th>word 2</th><th>word 3</th></tr>
+      </table>
+    </div>
+    <div class="mem">
+      <div class="ttl" style="font-size:18px">Main memory</div>
+      <div class="slow" style="margin-top:4px">slow: LAT + 4 cycles per line</div>
+      <div class="stat" style="margin-top:22px"><span class="muted">hits</span><span id="cHits" style="color:var(--good)">0</span></div>
+      <div class="stat"><span class="muted">misses</span><span id="cMiss" style="color:var(--bad)">0</span></div>
+      <div class="stat"><span class="muted">cycles</span><span id="cCyc">0</span></div>
+      <p style="font-size:14px;margin-top:16px">A miss brings the <b>whole 4-word line</b>, so the next 3 reads are free hits.</p>
+    </div>
+  </div>
+  <div class="notes">The demo loops by itself. Watch the address split into tag, index and offset. The index picks the row. Same tag = hit. The last access (0x1040) maps to set 0 too and evicts the line: a conflict miss.</div>
+</section>
+
+<!-- 9 FOUR ORGS -->
+<section class="slide">
+  <div class="kicker rise">Phase II · what we compare</div>
+  <h2 class="rise d1">Four organisations, same core, same memory</h2>
+  <div class="row" style="margin-top:28px;gap:18px">
+    <div class="card col" data-f="1" style="border-top:4px solid var(--s-vn)"><div class="pill">vn_flat</div><h3 style="font-size:22px;margin:12px 0 6px">Von Neumann, no cache</h3><p style="font-size:17px">One port to slow memory. Baseline.</p></div>
+    <div class="card col" data-f="2" style="border-top:4px solid var(--s-sflat)"><div class="pill">split_flat</div><h3 style="font-size:22px;margin:12px 0 6px">Harvard ports, no cache</h3><p style="font-size:17px">Two paths, one slow memory behind both.</p></div>
+    <div class="card col" data-f="3" style="border-top:4px solid var(--s-uni)"><div class="pill">unified</div><h3 style="font-size:22px;margin:12px 0 6px">One shared L1 cache</h3><p style="font-size:17px">Code and data share one cache (2× sets, same total size).</p></div>
+    <div class="card col" data-f="4" style="border-top:4px solid var(--s-split);box-shadow:0 0 30px #3987e533"><div class="pill" style="color:#a9c8ff">split · proposed</div><h3 style="font-size:22px;margin:12px 0 6px">Modified Harvard</h3><p style="font-size:17px">Separate I-cache and D-cache over one shared memory.</p></div>
+  </div>
+  <p data-f="5" style="margin-top:28px">Fair comparison: <b>same total cache capacity</b>, same core, same main memory, same programs.</p>
+  <div class="notes">Colours stay the same in every chart from here: orange VN-flat, green split-flat, yellow unified, blue split (ours).</div>
+</section>
+
+<!-- 10 MODIFIED HARVARD -->
+<section class="slide">
+  <div class="kicker rise">Proposed design · modharvard_top.v</div>
+  <h2 class="rise d1">Harvard at the top, shared memory below</h2>
+  <svg viewBox="0 0 1140 470" width="1140" height="470" style="margin-top:6px">
+    <rect x="40" y="170" width="170" height="140" rx="14" class="box" data-f="1"/><text x="125" y="235" text-anchor="middle" class="ttl" data-f="1">cpu_core</text><text x="125" y="260" text-anchor="middle" class="lbl" data-f="1">single-cycle</text>
+    <g data-f="2">
+      <rect x="320" y="70" width="190" height="110" rx="14" class="boxh"/><text x="415" y="118" text-anchor="middle" class="ttl">I-cache</text><text x="415" y="145" text-anchor="middle" class="lbl">l1_cache (read-only)</text>
+      <rect x="320" y="300" width="190" height="110" rx="14" class="boxo"/><text x="415" y="345" text-anchor="middle" class="ttl">D-cache</text><text x="415" y="372" text-anchor="middle" class="lbl">+ 1-entry write buffer</text>
+      <path id="mhI" d="M210 210 C260 210 270 125 320 125" class="wire"/>
+      <path id="mhD" d="M210 270 C260 270 270 355 320 355" class="wire"/>
+      <circle r="9" fill="var(--s-split)"><animateMotion dur="1.2s" repeatCount="indefinite" keyPoints="0;1;0" keyTimes="0;.5;1" calcMode="linear"><mpath href="#mhI"/></animateMotion></circle>
+      <circle r="9" fill="var(--s-vn)"><animateMotion dur="1.2s" repeatCount="indefinite" keyPoints="0;1;0" keyTimes="0;.5;1" calcMode="linear"><mpath href="#mhD"/></animateMotion></circle>
+      <text x="245" y="245" text-anchor="middle" class="lbl" font-size="13">hits: both</text><text x="245" y="262" text-anchor="middle" class="lbl" font-size="13">in parallel</text>
+    </g>
+    <g data-f="3">
+      <rect x="620" y="185" width="160" height="110" rx="14" class="box"/><text x="700" y="235" text-anchor="middle" class="ttl">arbiter</text><text x="700" y="260" text-anchor="middle" class="lbl">I-side first</text>
+      <path id="mhIm" d="M510 125 C570 125 570 220 620 220" class="wire"/>
+      <path id="mhDm" d="M510 355 C570 355 570 260 620 260" class="wire"/>
+      <circle r="8" fill="var(--s-split)" opacity=".9"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.6;.75;1" calcMode="linear"><mpath href="#mhIm"/></animateMotion></circle>
+      <text x="565" y="300" text-anchor="middle" class="lbl" font-size="13">misses only</text>
+    </g>
+    <g data-f="4">
+      <rect x="890" y="150" width="210" height="180" rx="14" class="boxo" style="fill:#221a28;stroke:#8a7bb6"/><text x="995" y="215" text-anchor="middle" class="ttl">main_mem</text><text x="995" y="242" text-anchor="middle" class="lbl">8 KB · code + data</text><text x="995" y="268" text-anchor="middle" class="lbl">LAT cycles · bursts</text>
+      <path id="mhM" d="M780 240H890" class="wire"/>
+      <circle r="8" fill="#c9b8ff"><animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;0;1;1;0" keyTimes="0;.75;.82;.9;1" calcMode="linear"><mpath href="#mhM"/></animateMotion></circle>
+    </g>
+    <g data-f="5">
+      <rect x="40" y="380" width="170" height="56" rx="12" class="box"/><text x="125" y="414" text-anchor="middle" class="lbl">hier_perf counters</text>
+      <text x="640" y="400" class="lbl">core_stall = halted | i_stall | d_stall | io_wait</text>
+      <text x="640" y="428" class="lbl">I/O is uncached and waits for the write buffer (fence)</text>
+    </g>
+  </svg>
+  <div class="notes">This is what real CPUs do. The core sees Harvard (two ports, both hit in one cycle). Main memory is Von Neumann (one copy of code and data). The arbiter only sees traffic when a cache misses.</div>
+</section>
+
+<!-- 11 MISS TIMELINE -->
+<section class="slide" id="s-tl">
+  <div class="kicker rise">Timing · LAT = 4, 4-word line</div>
+  <h2 class="rise d1">Anatomy of a miss, cycle by cycle</h2>
+  <p class="rise d2">Miss penalty = <b>LAT + words per line</b> = 4 + 4 = <b>8 cycles</b>. A store costs <b>1 cycle</b> thanks to the write buffer.</p>
+  <div class="tl" id="tl"></div>
+  <div class="row" style="margin-top:22px;font-size:15px;gap:18px;flex-wrap:wrap" id="tlKey"></div>
+  <div class="notes">Press to play. lw misses at cycle 0; the arbiter grants at once; memory waits LAT cycles, then streams 4 words. At cycle 8 the lw hits and retires. The sw at cycle 9 goes into the write buffer and the core moves on while memory writes in the background.</div>
+</section>
+
+<!-- 12 CPI RESULT -->
+<section class="slide" id="s-cpi">
+  <div class="kicker rise">Phase II · headline result</div>
+  <h2 class="rise d1">CPI at LAT = 8 (geo-mean of 7 programs)</h2>
+  <p class="rise d2">Lower is better. 512 B of L1 in total, 16-byte lines.</p>
+  <div class="vbars" style="margin-top:26px" id="cpiBars"></div>
+  <div class="vlabels" id="cpiLabels"></div>
+  <div class="row" style="margin-top:20px">
+    <div class="card col" data-f="2" style="text-align:center"><span class="big-num" style="font-size:44px;color:#a9c8ff">1.40×</span><p style="font-size:16px">split L1 vs unified L1</p></div>
+    <div class="card col" data-f="3" style="text-align:center"><span class="big-num" style="font-size:44px;color:#a9c8ff">6.1×</span><p style="font-size:16px">split L1 vs no cache</p></div>
+    <div class="card col" data-f="4" style="text-align:center"><span class="big-num" style="font-size:44px">4.0 % <span class="muted" style="font-size:28px">vs</span> 8.9 %</span><p style="font-size:16px">read miss rate, split vs unified</p></div>
+  </div>
+  <div class="notes">Press once to grow the bars. Caches give the big jump (12 to under 3). Splitting the caches gives the last 1.4×.</div>
+</section>
+
+<!-- 13 LATENCY SWEEP -->
+<section class="slide" id="s-lat">
+  <div class="kicker rise">Sweep · memory latency</div>
+  <h2 class="rise d1">The slower the memory, the more the split L1 wins</h2>
+  <div class="row" style="margin-top:8px">
+    <div style="flex:none"><svg id="latChart" width="780" height="480" viewBox="0 0 780 480"></svg></div>
+    <div class="col" style="padding-top:40px">
+      <div class="card" data-f="1"><p style="font-size:18px">Without caches, CPI grows with LAT: <b>3.7 → 22</b>.</p></div>
+      <div class="card" data-f="2" style="margin-top:14px"><p style="font-size:18px">With caches it stays low. At LAT = 16: split <b>2.85</b>, unified <b>4.05</b>.</p></div>
+      <div class="card" data-f="3" style="margin-top:14px;border-color:var(--s-split)"><p style="font-size:18px">The gap between split and unified <b>widens</b> as memory gets slower, because every extra miss costs more.</p></div>
+    </div>
+  </div>
+  <div class="notes">Geo-mean CPI over 7 programs at LAT = 1, 2, 4, 8, 16. The two flat designs are almost on top of each other.</div>
+</section>
+
+<!-- 14 CONFLICT -->
+<section class="slide">
+  <div class="kicker rise">Why unified loses</div>
+  <h2 class="rise d1">Code and data fight over the same cache lines</h2>
+  <p class="rise d2">Code starts at <code>0x0000</code>, data at <code>0x1000</code>. 4 KB is a multiple of the cache size, so both map to the <b>same sets</b>.</p>
+  <div class="row" style="margin-top:34px;align-items:flex-start">
+    <div class="col rise d3">
+      <div class="ttl" style="color:#ebc46a;margin-bottom:14px">Unified L1: set 0</div>
+      <div style="display:flex;align-items:center;gap:20px">
+        <div class="slot fight"><span class="a">CODE 0x0000</span><span class="b">DATA 0x1000</span></div>
+        <div class="evict">evict!</div>
+      </div>
+      <p style="margin-top:18px;font-size:18px">Each one throws the other out: <b>conflict misses</b>.</p>
+    </div>
+    <div class="col rise d4">
+      <div class="ttl" style="color:#a9c8ff;margin-bottom:14px">Split L1: separate caches</div>
+      <div style="display:flex;gap:16px">
+        <div><div class="muted mono" style="font-size:12px;margin-bottom:6px">I-CACHE SET 0</div><div class="slot" style="width:200px;border-color:var(--s-split)"><span class="a">CODE</span></div></div>
+        <div><div class="muted mono" style="font-size:12px;margin-bottom:6px">D-CACHE SET 0</div><div class="slot" style="width:200px;border-color:var(--s-vn)"><span class="b">DATA</span></div></div>
+      </div>
+      <p style="margin-top:18px;font-size:18px">No fight: both stay put.</p>
+    </div>
+  </div>
+  <div class="card" data-f="1" style="margin-top:28px;display:flex;gap:40px;align-items:center">
+    <div><span class="big-num" style="font-size:46px;color:#ebc46a">55 %</span><span class="muted"> unified</span></div>
+    <div><span class="big-num" style="font-size:46px;color:#a9c8ff">6 %</span><span class="muted"> split</span></div>
+    <p style="font-size:18px">matmul data-miss rate. Unified also pays <b>1 port-conflict cycle</b> on every load/store.</p>
+  </div>
+  <div class="notes">This is the main reason the split design wins. The second reason: a unified cache has one port, so a load/store still needs a second cycle, just like Phase I Von Neumann.</div>
+</section>
+
+<!-- 15 PER PROGRAM -->
+<section class="slide" id="s-prog">
+  <div class="kicker rise">Per program · LAT = 8</div>
+  <h2 class="rise d1">Split wins on every program</h2>
+  <p class="rise d2">CPI, lower is better. <span style="color:#a9c8ff">■</span> split L1 &nbsp; <span style="color:#ebc46a">■</span> unified L1 &nbsp;·&nbsp; the number under each name is the split speed-up</p>
+  <svg id="progChart" width="1140" height="440" viewBox="0 0 1140 440" style="margin-top:8px"></svg>
+  <div class="notes">From 1.02× (fibonacci, tiny loop, little data) to 1.87× (vector_add). unrolled_sum is the one case where a bigger shared cache helps the I-side, but split still wins overall (1.11×).</div>
+</section>
+
+<!-- 16 VERIFICATION -->
+<section class="slide" id="s-ver">
+  <div class="kicker rise">Verification</div>
+  <h2 class="rise d1">How we know the numbers are right</h2>
+  <div class="row" style="margin-top:20px">
+    <div class="col">
+      <div class="check" data-f="1"><svg class="tick" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/><path d="M13 23l6 6 12-13"/></svg><div><b style="font-size:21px">Correct results</b><p style="font-size:17px">Final memory equals the Python golden-model (ISS) image, word for word.</p></div></div>
+      <div class="check" data-f="2"><svg class="tick" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/><path d="M13 23l6 6 12-13"/></svg><div><b style="font-size:21px">Exact miss counts</b><p style="font-size:17px">Every hardware cache counter equals an independent Python cache model, exactly.</p></div></div>
+      <div class="check" data-f="3"><svg class="tick" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/><path d="M13 23l6 6 12-13"/></svg><div><b style="font-size:21px">Every cycle explained</b><p style="font-size:17px"><code>cycles = instret + Σ stalls</code>: each cycle retires an instruction or has exactly one stall cause.</p></div></div>
+      <div class="check" data-f="4"><svg class="tick" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/><path d="M13 23l6 6 12-13"/></svg><div><b style="font-size:21px">Unit tests</b><p style="font-size:17px">9 address-decoder checks and 11 directed cache checks.</p></div></div>
+    </div>
+    <div style="width:340px;text-align:center;padding-top:40px" data-f="5" class="pop">
+      <div class="big-num mono" style="font-size:96px;color:var(--good)"><span id="runCount">0</span></div>
+      <p style="font-size:20px">/ 266 hierarchy runs <b style="color:var(--good)">PASS</b></p>
+      <p style="font-size:15px;margin-top:10px">+ 14 Phase I runs · one command:<br><code>sim/run_all.sh</code></p>
+    </div>
+  </div>
+  <div class="notes">The model can match exactly because the caches are direct-mapped and never allocate on a write, so hits and misses depend only on the order of accesses, not on timing.</div>
+</section>
+
+<!-- 17 SYNTHESIS -->
+<section class="slide" id="s-syn">
+  <div class="kicker rise">Hardware cost · Yosys synth_xilinx</div>
+  <h2 class="rise d1">Split caches cost no more than a unified one</h2>
+  <div class="row" style="margin-top:20px;align-items:flex-start">
+    <div class="col">
+      <div id="lutBars"></div>
+      <p style="font-size:15px;margin-top:10px" class="muted">LUTs (logic cells). Counters are removed by synthesis since they drive no pins.</p>
+    </div>
+    <div style="width:470px">
+      <table class="syn rise d3">
+        <tr><th>DESIGN</th><th>LUT</th><th>FF</th><th>LUTRAM</th></tr>
+        <tr><td>Harvard (P-I)</td><td>874</td><td>129</td><td>140</td></tr>
+        <tr><td>Von Neumann (P-I)</td><td>1210</td><td>162</td><td>268</td></tr>
+        <tr><td style="color:#a9c8ff">Split L1</td><td>1676</td><td>303</td><td>388</td></tr>
+        <tr><td style="color:#ebc46a">Unified L1</td><td>1770</td><td>315</td><td>387</td></tr>
+      </table>
+      <p style="font-size:15px;margin-top:14px">Cache arrays use one write port, so they map to LUT-RAM instead of thousands of flip-flops. No Fmax claimed (needs place-and-route).</p>
+    </div>
+  </div>
+  <div class="notes">Split is about 5 % smaller than unified: the unified design needs the extra FETCH/DATA arbiter and instruction register in front of its single cache.</div>
+</section>
+
+<!-- 18 TEAM -->
+<section class="slide">
+  <div class="kicker rise">Who did what</div>
+  <h2 class="rise d1">Team contributions</h2>
+  <div class="row" style="margin-top:26px;gap:14px;flex-wrap:wrap">
+    <div class="card" data-f="1" style="width:368px"><b style="font-size:20px">Aaryan Yadav</b><p style="font-size:16px;margin-top:6px">Core (PC, regfile, ALU, imm-gen, control), stall interface, <code>modharvard_top</code>, synthesis flow</p></div>
+    <div class="card" data-f="1" style="width:368px"><b style="font-size:20px">Shashwat Sinha</b><p style="font-size:16px;margin-top:6px">Instruction memory, assembler + golden ISS, access trace, cache model, benchmarks</p></div>
+    <div class="card" data-f="1" style="width:368px"><b style="font-size:20px">Shivam Mishra</b><p style="font-size:16px;margin-top:6px">Data memory, address decoder, R/W control, I/O, <code>l1_cache</code> with write buffer</p></div>
+    <div class="card" data-f="2" style="width:368px"><b style="font-size:20px">Himank Kaushik</b><p style="font-size:16px;margin-top:6px">Von Neumann baseline, <code>main_mem</code>, arbiter, unified-cache baseline, counters</p></div>
+    <div class="card" data-f="2" style="width:368px"><b style="font-size:20px">Satyam Kumar</b><p style="font-size:16px;margin-top:6px">Testbenches, sweep scripts, figures, IEEE reports, demo video</p></div>
+  </div>
+  <div class="notes">Each member can explain their own files line by line; see docs/INTERVIEW_PREP.md.</div>
+</section>
+
+<!-- 19 CONCLUSION -->
+<section class="slide">
+  <div class="kicker rise">Conclusion</div>
+  <h2 class="rise d1">What we learned</h2>
+  <ul style="margin:24px 0 0 26px">
+    <li data-f="1"><b>Harvard removes the structural hazard</b>: CPI 1.00 vs 1 + f<sub>mem</sub> (up to 1.47× in Phase I).</li>
+    <li data-f="2" style="margin-top:14px"><b>Split paths alone don't help with slow shared memory</b>: only about 2 %.</li>
+    <li data-f="3" style="margin-top:14px"><b>Modified Harvard</b> (split L1 over shared memory) is the winner: <b>1.40×</b> over unified, <b>6.1×</b> over no cache, at lower hardware cost.</li>
+    <li data-f="4" style="margin-top:14px">Everything is <b>self-checked</b>: 266/266 runs with exact model agreement.</li>
+  </ul>
+  <div class="card" data-f="5" style="margin-top:30px"><p style="font-size:18px"><b>Limits &amp; next steps:</b> single-cycle core, direct-mapped caches, 1-entry write buffer, no FPGA timing. Next: a pipeline, set-associative caches, a deeper write buffer, an FPGA run.</p></div>
+  <div class="notes">End on the one sentence: real CPUs are Harvard at L1 and Von Neumann below, and our numbers show why.</div>
+</section>
+
+<!-- 20 THANKS -->
+<section class="slide" id="s-end">
+  <div id="cells2" style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(24,1fr);gap:6px;padding:20px;opacity:.25"></div>
+  <div style="position:relative;z-index:2;text-align:center;margin-top:210px">
+    <h1 class="rise" style="font-size:80px">Thank you</h1>
+    <p class="sub rise d1" style="margin-top:14px">Questions?</p>
+    <p class="rise d2 mono" style="font-size:16px;margin-top:30px;color:var(--muted)">report/final_report.pdf · docs/PROJECT_EXPLAINED.md · sim/run_all.sh</p>
+  </div>
+  <div class="notes">Open for questions.</div>
+</section>
+
+</div></div>
+<div id="notes"><div class="t">SPEAKER NOTES · press N to hide</div><div id="notesBody"></div></div>
+<div id="help">← → navigate · N notes · F fullscreen</div>
+<div id="count"></div>
+
+<script>
+(function(){
+const deck=document.getElementById('deck');
+const slides=[...document.querySelectorAll('.slide')];
+const C={split:'#3987e5',vn:'#d95926',sflat:'#199e70',uni:'#c98500'};
+const CT={split:'#a9c8ff',vn:'#ffb08e',sflat:'#7fdcb8',uni:'#ebc46a'};
+let cur=0, step=0;
+
+function fit(){const s=Math.min(innerWidth/1280,innerHeight/720);deck.style.transform=`translate(-50%,-50%) scale(${s})`;}
+addEventListener('resize',fit);fit();
+
+function maxStep(sl){let m=0;sl.querySelectorAll('[data-f]').forEach(e=>m=Math.max(m,+e.dataset.f));return m;}
+function applyStep(){
+  const sl=slides[cur];
+  sl.querySelectorAll('[data-f]').forEach(e=>e.classList.toggle('on',+e.dataset.f<=step));
+  const h=hooks[sl.id];if(h&&h.step)h.step(step);
+}
+function show(n,s){
+  n=Math.max(0,Math.min(slides.length-1,n));
+  const prev=cur;
+  slides.forEach((sl,i)=>{sl.classList.toggle('active',i===n);sl.classList.toggle('past',i<n);});
+  if(prev!==n||!slides[n].dataset.seen){
+    const ph=hooks[slides[prev].id];if(prev!==n&&ph&&ph.leave)ph.leave();
+  }
+  cur=n;step=s===undefined?0:s;
+  const h=hooks[slides[n].id];if(h&&h.enter)h.enter();
+  slides[n].dataset.seen=1;
+  applyStep();
+  document.getElementById('bar').style.width=((n+1)/slides.length*100)+'%';
+  document.getElementById('count').textContent=(n+1)+' / '+slides.length;
+  const nt=slides[n].querySelector('.notes');document.getElementById('notesBody').textContent=nt?nt.textContent:'';
+  history.replaceState(null,'','#'+(n+1));
+}
+function next(){if(step<maxStep(slides[cur])){step++;applyStep();}else if(cur<slides.length-1)show(cur+1);}
+function prev(){if(step>0){step--;applyStep();}else if(cur>0)show(cur-1,maxStep(slides[cur-1]));}
+addEventListener('keydown',e=>{
+  if(['ArrowRight','PageDown',' ','Enter','ArrowDown'].includes(e.key)){e.preventDefault();next();}
+  else if(['ArrowLeft','PageUp','ArrowUp','Backspace'].includes(e.key)){e.preventDefault();prev();}
+  else if(e.key==='Home')show(0);else if(e.key==='End')show(slides.length-1);
+  else if(e.key==='n'||e.key==='N')document.getElementById('notes').classList.toggle('show');
+  else if(e.key==='f'||e.key==='F'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{});}
+});
+document.getElementById('stage').addEventListener('click',e=>{if(e.clientX>innerWidth*0.3)next();else prev();});
+let tx=null;addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>40)(dx<0?next:prev)();tx=null;});
+
+/* ---------- title cells ---------- */
+const cells=document.getElementById('cells');
+for(let i=0;i<96;i++){const s=document.createElement('span');if(Math.random()<.35)s.className='d';s.style.animationDelay=(Math.random()*4).toFixed(2)+'s';cells.appendChild(s);}
+const cells2=document.getElementById('cells2');
+for(let i=0;i<24*13;i++){const s=document.createElement('span');s.style.cssText='border-radius:5px;background:#1b2440;animation:blink 5s infinite;animation-delay:'+(Math.random()*5).toFixed(2)+'s';if(Math.random()<.3)s.style.animationName='blinkD';cells2.appendChild(s);}
+
+/* ---------- ticker ---------- */
+const prog=['addi x1,x0,0','lw x2,0(x5)','add x3,x3,x2','addi x5,x5,4','sw x3,4(x6)','bne x5,x7,loop','lw x4,8(x5)','slli x4,x4,1','add x1,x1,x4','sw x1,0(x6)','jal x0,next','addi x6,x6,4'];
+const tr=document.getElementById('ticker');
+[...prog,...prog].forEach(p=>{const d=document.createElement('div');const m=/^(lw|sw)/.test(p);d.className='ins'+(m?' m':'');d.innerHTML=p+'<small>'+(m?'fetch + data':'fetch')+'</small>';tr.appendChild(d);});
+
+/* ---------- slow-memory clock ticks ---------- */
+const ck=document.getElementById('clockTicks');
+for(let i=0;i<8;i++){const c=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  c.setAttribute('x',150+i*17);c.setAttribute('y',150);c.setAttribute('width',12);c.setAttribute('height',12);c.setAttribute('rx',3);c.setAttribute('fill','#ebc46a');c.setAttribute('opacity','0.15');
+  const a=document.createElementNS('http://www.w3.org/2000/svg','animate');a.setAttribute('attributeName','opacity');a.setAttribute('dur','4s');a.setAttribute('repeatCount','indefinite');
+  const t=(0.14+i*0.085).toFixed(3);a.setAttribute('values','0.15;0.15;1;1;0.15');a.setAttribute('keyTimes','0;'+t+';'+(+t+.02).toFixed(3)+';0.9;1');c.appendChild(a);ck.appendChild(c);}
+
+const hooks={};
+
+/* ---------- cycle strips ---------- */
+hooks['s-cycles']={
+  enter(){['stripVN','stripH'].forEach(id=>document.getElementById(id).classList.remove('go'));},
+  step(s){['stripVN','stripH'].forEach((id,k)=>{const el=document.getElementById(id);
+    if(s>=1){el.querySelectorAll('.cy').forEach((c,i)=>c.style.animationDelay=(i*0.32)+'s');el.classList.add('go');}else el.classList.remove('go');});}
+};
+// add a step 1 trigger without a visible fragment
+(function(){const s=document.getElementById('s-cycles');const d=document.createElement('i');d.dataset.f='1';d.style.display='none';s.appendChild(d);})();
+
+/* ---------- Phase I bars ---------- */
+const p1=[['unrolled_sum',1.470,.470],['memcpy',1.327,.327],['vector_add',1.314,.314],['bubble_sort',1.311,.311],['array_sum',1.199,.199],['matmul',1.056,.056],['fibonacci',1.016,.016]];
+const pb=document.getElementById('p1bars');
+p1.forEach(([n,v,f])=>{pb.insertAdjacentHTML('beforeend',`<div class="hbar"><div class="n">${n}</div><div class="t"><div class="fill" data-w="${(v-1)/0.5*100}"></div></div><div class="v">${v.toFixed(2)}×</div></div>`);});
+pb.insertAdjacentHTML('beforeend','<div class="hbar"><div></div><div class="mono muted" style="display:flex;justify-content:space-between;font-size:12px"><span>1.0×</span><span>1.25×</span><span>1.5×</span></div><div></div></div>');
+hooks['s-p1']={enter(){const f=pb.querySelectorAll('.fill');f.forEach(e=>e.style.width=0);
+  setTimeout(()=>f.forEach((e,i)=>setTimeout(()=>e.style.width=e.dataset.w+'%',i*90)),350);}};
+
+/* ---------- cache demo ---------- */
+const SETS=4, LINE=4, LAT=4;
+const tbl=document.getElementById('cTable');
+for(let s=0;s<SETS;s++)tbl.insertAdjacentHTML('beforeend',`<tr id="cr${s}"><td>${s}</td><td class="v">0</td><td class="tg">-</td>${[0,1,2,3].map(w=>`<td class="w">-</td>`).join('')}</tr>`);
+const seq=[0x1000,0x1004,0x1008,0x100C,0x1010,0x1014,0x1000,0x1040,0x1000];
+const why={};
+let cState, cTimer=null, cPos=0, hits=0, miss=0, cyc=0;
+function cReset(){cState=Array.from({length:SETS},()=>({v:0,tag:null}));cPos=0;hits=miss=cyc=0;
+  for(let s=0;s<SETS;s++){const r=document.getElementById('cr'+s);r.className='';r.querySelector('.v').textContent='0';r.querySelector('.tg').textContent='-';r.querySelectorAll('.w').forEach(w=>w.textContent='-');}
+  upd();}
+function upd(){document.getElementById('cHits').textContent=hits;document.getElementById('cMiss').textContent=miss;document.getElementById('cCyc').textContent=cyc;}
+function hex(a){return '0x'+a.toString(16).toUpperCase().padStart(4,'0');}
+function cStep(){
+  if(cPos>=seq.length){cReset();return;}
+  const a=seq[cPos++], w=a>>2, off=w%LINE, idx=Math.floor(w/LINE)%SETS, tag=Math.floor(w/(LINE*SETS));
+  document.getElementById('cReq').textContent=hex(a);
+  document.getElementById('cTag').textContent='tag '+tag;document.getElementById('cIdx').textContent='set '+idx;document.getElementById('cOff').textContent='word '+off;
+  for(let s=0;s<SETS;s++)document.getElementById('cr'+s).className='';
+  const row=document.getElementById('cr'+idx), st=document.getElementById('cStat'), wy=document.getElementById('cWhy');
+  const L=cState[idx];
+  if(L.v&&L.tag===tag){hits++;cyc+=1;row.className='sel hit';st.className='status hit';st.textContent='HIT ✓';wy.textContent='Tag matches: answer in 1 cycle.';
+    const cell=row.querySelectorAll('.w')[off];cell.classList.remove('flash');void cell.offsetWidth;cell.classList.add('flash');}
+  else{miss++;cyc+=1+LAT+LINE;row.className='sel miss';st.className='status miss';st.textContent='MISS ✗';
+    wy.textContent=L.v?'Same set, different tag: old line evicted (conflict).':'Line not here yet: fetch 4 words from memory.';
+    L.v=1;L.tag=tag;row.querySelector('.v').textContent='1';row.querySelector('.tg').textContent=tag;
+    const base=(w-off)*4;row.querySelectorAll('.w').forEach((c,i)=>{c.textContent='-';setTimeout(()=>{c.textContent='['+hex(base+4*i).slice(2)+']';c.classList.remove('flash');void c.offsetWidth;c.classList.add('flash');},250+i*170);});}
+  upd();
+}
+hooks['s-cache']={enter(){cReset();clearInterval(cTimer);setTimeout(cStep,600);cTimer=setInterval(cStep,1900);},leave(){clearInterval(cTimer);}};
+
+/* ---------- miss timeline ---------- */
+const tl=document.getElementById('tl');
+const rows={
+ 'Core':     [['lw','stall'],['','stall'],['','stall'],['','stall'],['','stall'],['','stall'],['','stall'],['','stall'],['lw ✓','run'],['sw ✓','run'],['add','run'],['add','run'],['addi','run'],['beq','run']],
+ 'D-cache':  [['miss','req'],['refill','req'],['','req'],['','req'],['w0','beat'],['w1','beat'],['w2','beat'],['w3','beat'],['hit','run'],['→ buf','wb'],['drain','wb'],['','wb'],['','wb'],['','wb']],
+ 'Main mem': [['grant','req'],['wait','wait'],['wait','wait'],['wait','wait'],['beat 0','beat'],['beat 1','beat'],['beat 2','beat'],['beat 3','beat'],['','e'],['','e'],['accept','req'],['wait','wait'],['wait','wait'],['wait…','wait']]
+};
+let html='<div></div>';for(let c=0;c<14;c++)html+=`<div class="h">c${c}</div>`;
+Object.entries(rows).forEach(([r,cs])=>{html+=`<div class="r">${r}</div>`;cs.forEach(([t,k],c)=>html+=`<div class="c ${k}" style="animation-delay:${(c*0.4).toFixed(2)}s">${t}</div>`);});
+tl.innerHTML=html+'<div id="cursor"></div>';
+document.getElementById('tlKey').innerHTML=[['stall','core stalled'],['run','instruction retires'],['req','request / grant'],['wait','memory latency'],['beat','data word arrives'],['wb','write buffer drain']]
+ .map(([k,t])=>`<span style="display:flex;align-items:center;gap:8px"><span class="c ${k}" style="opacity:1;transform:none;width:22px;height:18px;display:inline-block"></span><span class="muted">${t}</span></span>`).join('');
+(function(){const s=document.getElementById('s-tl');const d=document.createElement('i');d.dataset.f='1';d.style.display='none';s.appendChild(d);})();
+const kf=document.createElement('style');kf.textContent='@keyframes sweep{0%{opacity:1;left:130px}100%{opacity:1;left:100%}}';document.head.appendChild(kf);
+hooks['s-tl']={enter(){tl.classList.remove('go');},step(s){if(s>=1){tl.classList.remove('go');void tl.offsetWidth;tl.classList.add('go');}else tl.classList.remove('go');}};
+
+/* ---------- CPI bars ---------- */
+const cpi=[['vn_flat','Von Neumann','no cache',12.28,'vn'],['split_flat','Harvard ports','no cache',12.01,'sflat'],['unified','Unified L1','one cache',2.81,'uni'],['split','Split L1','proposed',2.01,'split']];
+const cb=document.getElementById('cpiBars'), cl=document.getElementById('cpiLabels');
+cpi.forEach(([k,n,s,v,c])=>{cb.insertAdjacentHTML('beforeend',`<div class="vb"><div class="val" style="color:${CT[c]}" data-v="${v}">0.00</div><div class="col" style="background:${C[c]}" data-h="${v/13*100}"></div></div>`);
+  cl.insertAdjacentHTML('beforeend',`<div>${n}<small>${s}</small></div>`);});
+(function(){const s=document.getElementById('s-cpi');const d=document.createElement('i');d.dataset.f='1';d.style.display='none';s.appendChild(d);})();
+function countUp(el,to,dec,ms){const t0=performance.now();(function f(t){const p=Math.min(1,(t-t0)/ms);const e=1-Math.pow(1-p,3);el.textContent=(to*e).toFixed(dec);if(p<1)requestAnimationFrame(f);})(t0);}
+hooks['s-cpi']={enter(){cb.querySelectorAll('.col').forEach(e=>e.style.height=0);cb.querySelectorAll('.val').forEach(e=>e.textContent='0.00');},
+  step(s){if(s>=1&&!cb.dataset.done){cb.querySelectorAll('.col').forEach((e,i)=>setTimeout(()=>e.style.height=e.dataset.h+'%',i*150));
+    cb.querySelectorAll('.val').forEach((e,i)=>setTimeout(()=>countUp(e,+e.dataset.v,2,1100),i*150));cb.dataset.done=1;}
+    if(s===0){delete cb.dataset.done;this.enter();}}};
+
+/* ---------- latency chart ---------- */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!==undefined)e.textContent=text;if(parent)parent.appendChild(e);return e;}
+const lat=[1,2,4,8,16];
+const LS=[['vn_flat','VN, no cache',[3.69,4.92,7.37,12.28,22.11],'vn'],['split_flat','Harvard, no cache',[3.41,4.64,7.10,12.01,21.84],'sflat'],['unified','Unified L1',[1.83,1.96,2.22,2.81,4.05],'uni'],['split','Split L1',[1.37,1.45,1.60,2.01,2.85],'split']];
+const lc=document.getElementById('latChart');
+const X0=70,X1=600,Y0=430,Y1=30,YM=24;
+const xs=i=>X0+i*(X1-X0)/4, ys=v=>Y0-(v/YM)*(Y0-Y1);
+[0,4,8,12,16,20,24].forEach(v=>{el('line',{x1:X0,x2:X1,y1:ys(v),y2:ys(v),class:'grid'},lc);el('text',{x:X0-12,y:ys(v)+4,'text-anchor':'end',class:'tickl'},lc,v);});
+el('line',{x1:X0,x2:X1,y1:Y0,y2:Y0,class:'axis'},lc);
+lat.forEach((l,i)=>el('text',{x:xs(i),y:Y0+22,'text-anchor':'middle',class:'tickl'},lc,l));
+el('text',{x:(X0+X1)/2,y:Y0+44,'text-anchor':'middle',class:'tickl'},lc,'memory latency LAT (cycles)');
+el('text',{x:X0-50,y:Y1-10,class:'tickl'},lc,'CPI');
+const paths=[];
+const labelY=[];LS.forEach(s=>labelY.push(ys(s[2][4])));
+// nudge end labels apart
+const order=labelY.map((y,i)=>[y,i]).sort((a,b)=>a[0]-b[0]);for(let k=1;k<order.length;k++){if(order[k][0]-order[k-1][0]<20)order[k][0]=order[k-1][0]+20;}
+order.forEach(([y,i])=>labelY[i]=y);
+LS.forEach(([k,n,v,c],si)=>{
+  const d=v.map((y,i)=>(i?'L':'M')+xs(i)+' '+ys(y)).join(' ');
+  const p=el('path',{d,class:'series',stroke:C[c]},lc);paths.push(p);
+  const g=el('g',{class:'ptg'},lc);g.style.opacity=0;g.style.transition='opacity .5s';
+  v.forEach((y,i)=>{const ci=el('circle',{cx:xs(i),cy:ys(y),r:5,fill:C[c],stroke:'#141b2e','stroke-width':2},g);el('title',{},ci,`${n}: CPI ${y} at LAT ${lat[i]}`);});
+  el('text',{x:X1+12,y:labelY[si]+5,class:'endl',fill:CT[c]},g,`${n} ${v[4]}`);
+  p._g=g;
+});
+hooks['s-lat']={enter(){paths.forEach((p,i)=>{const L=p.getTotalLength();p.style.transition='none';p.style.strokeDasharray=L;p.style.strokeDashoffset=L;p._g.style.opacity=0;
+  void p.getBoundingClientRect();setTimeout(()=>{p.style.transition='stroke-dashoffset 1.4s cubic-bezier(.4,.1,.2,1)';p.style.strokeDashoffset=0;setTimeout(()=>p._g.style.opacity=1,1100);},300+i*250);});}};
+
+/* ---------- per-program grouped bars ---------- */
+const PG=[['fibonacci',1.531,1.555],['matmul',1.106,1.777],['bubble_sort',1.706,2.668],['memcpy',2.305,2.840],['array_sum',1.994,3.159],['vector_add',2.288,4.282],['unrolled_sum',4.381,4.849]];
+const pc=document.getElementById('progChart');
+const PX0=60,PX1=1120,PY0=380,PY1=20,PM=5;
+const py=v=>PY0-(v/PM)*(PY0-PY1);
+[0,1,2,3,4,5].forEach(v=>{el('line',{x1:PX0,x2:PX1,y1:py(v),y2:py(v),class:'grid'},pc);el('text',{x:PX0-10,y:py(v)+4,'text-anchor':'end',class:'tickl'},pc,v);});
+const gw=(PX1-PX0)/PG.length, bw=46;
+const pbars=[];
+PG.forEach(([n,s,u],i)=>{const cx=PX0+gw*i+gw/2;
+  [[s,'split',-bw-1],[u,'uni',1]].forEach(([v,c,dx])=>{const r=el('rect',{x:cx+dx,y:PY0,width:bw,height:0,rx:4,fill:C[c]},pc);r._v=v;el('title',{},r,`${n} ${c==='split'?'split L1':'unified L1'}: CPI ${v}`);pbars.push(r);
+    const t=el('text',{x:cx+dx+bw/2,y:py(v)-8,'text-anchor':'middle',class:'tickl',fill:CT[c]},pc,v.toFixed(2));t.style.fill=CT[c];t.style.opacity=0;t.style.transition='opacity .4s';r._t=t;});
+  el('text',{x:cx,y:PY0+24,'text-anchor':'middle',style:'font:600 15px Inter,sans-serif;fill:#b4bdd4'},pc,n);
+  el('text',{x:cx,y:PY0+46,'text-anchor':'middle',class:'tickl'},pc,(u/s).toFixed(2)+'×');
+});
+el('line',{x1:PX0,x2:PX1,y1:PY0,y2:PY0,class:'axis'},pc);
+hooks['s-prog']={enter(){pbars.forEach(r=>{r.style.transition='none';r.setAttribute('y',PY0);r.setAttribute('height',0);r._t.style.opacity=0;});
+  pbars.forEach((r,i)=>setTimeout(()=>{animRect(r,700);setTimeout(()=>r._t.style.opacity=1,650);},300+i*70));}};
+function animRect(r,ms){const t0=performance.now(),H=PY0-py(r._v);(function f(t){const p=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-p,3);r.setAttribute('y',PY0-H*e);r.setAttribute('height',H*e);if(p<1)requestAnimationFrame(f);})(t0);}
+
+/* ---------- verification counter ---------- */
+hooks['s-ver']={enter(){document.getElementById('runCount').textContent='0';this.done=false;},step(s){if(s>=5&&!this.done){this.done=true;countUp(document.getElementById('runCount'),266,0,1400);}if(s<5){this.done=false;document.getElementById('runCount').textContent='0';}}};
+
+/* ---------- synthesis bars ---------- */
+const SY=[['Harvard (P-I)',874,'#8592b5'],['Von Neumann (P-I)',1210,'#8592b5'],['Split L1',1676,C.split],['Unified L1',1770,C.uni]];
+const lb=document.getElementById('lutBars');
+SY.forEach(([n,v,c])=>lb.insertAdjacentHTML('beforeend',`<div class="hbar" style="grid-template-columns:170px 1fr 70px"><div class="n" style="font-family:Inter,sans-serif">${n}</div><div class="t"><div class="fill" style="background:${c}" data-w="${v/1900*100}"></div></div><div class="v">${v}</div></div>`));
+hooks['s-syn']={enter(){const f=lb.querySelectorAll('.fill');f.forEach(e=>e.style.width=0);setTimeout(()=>f.forEach((e,i)=>setTimeout(()=>e.style.width=e.dataset.w+'%',i*140)),350);}};
+
+const start=parseInt(location.hash.slice(1))||1;
+show(start-1);
+})();
+</script>
+</body>
+</html>
