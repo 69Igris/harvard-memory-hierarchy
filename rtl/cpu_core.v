@@ -24,6 +24,9 @@ module cpu_core (
     output wire [31:0] d_wdata,
     output wire        d_read,
     output wire        d_write,
+    output wire        d_wreq,         // store request, NOT gated by stall
+                                       // (used by the cache hierarchy to
+                                       //  decide whether to stall at all)
     input  wire [31:0] d_rdata,
 
     // ---------------- status
@@ -85,6 +88,7 @@ module cpu_core (
     assign d_wdata = rd2;
     assign d_read  = mem_read;
     assign d_write = mem_write & ~stall & ~rst;
+    assign d_wreq  = mem_write & ~rst;
 
     // ---------------------------------------------------------------- write-back
     assign wb_data = (wb_sel == 2'd1) ? d_rdata  :
