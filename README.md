@@ -13,9 +13,7 @@
 ## Deliverables
 - 📄 **Final IEEE report (Phase II):** [`report/final_report.pdf`](report/final_report.pdf) (source: `report/final_report.tex`)
 - 📄 Phase I IEEE report: [`report/report.pdf`](report/report.pdf)
-- 🎤 Interview preparation guide: [`docs/INTERVIEW_PREP.md`](docs/INTERVIEW_PREP.md)
 - 🎞️ Animated presentation (open in a browser): [`docs/presentation.html`](docs/presentation.html)
-- 📘 Plain-language explanation of the whole project: [`docs/PROJECT_EXPLAINED.md`](docs/PROJECT_EXPLAINED.md)
 
 ### Phase I deliverables
 - 📄 **IEEE report:** [`report/report.pdf`](report/report.pdf) (LaTeX source: `report/report.tex`)
@@ -113,18 +111,15 @@ sw/             rv32_asm.py (assembler + golden ISS + access trace), cache_model
                 programs/*.s (7 programs), build/ (generated)
 sim/            run_all.sh (everything), summarize.py, run_hier.py (Phase II sweep)
 synth/          run_synth.sh + parse_synth.py (Yosys)
-docs/           results.csv, results_hier.csv, synth.csv, make_figures*.py, figures/,
-                INTERVIEW_PREP.md
+docs/           results.csv, results_hier.csv, synth.csv, figures/, presentation.html
 report/         report.tex/pdf (Phase I), final_report.tex/pdf (Phase II, final)
 video/          VIDEO_LINK.md (demo video is on Google Drive)
 ```
 
 ## How to run
-Requirements: `iverilog`, `python3` (+ `matplotlib`, `vcdvcd` for figures), `yosys` for synthesis.
+Requirements: `iverilog`, `python3`, `yosys` for synthesis.
 ```bash
 ./sim/run_all.sh                       # Phase I + Phase II regression and sweeps
-python3 docs/make_figures.py           # Phase I figures
-python3 docs/make_figures_phase2.py    # Phase II figures
 ./synth/run_synth.sh                   # synthesis -> docs/synth.csv
 gtkwave sim/out/hier/vector_add_split_L4.vcd   # inspect a hierarchy waveform
 ```

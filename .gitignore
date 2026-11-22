@@ -19,3 +19,9 @@ video/*.mp4
 
 # synthesis logs (regenerate with synth/run_synth.sh)
 synth/logs/
+
+# local-only notes and figure-generation scripts (kept out of the repo)
+docs/INTERVIEW_PREP.md
+docs/PROJECT_EXPLAINED.md
+docs/make_figures*.py
+.DS_Store
